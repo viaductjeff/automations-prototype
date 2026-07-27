@@ -1547,8 +1547,23 @@ body {
   z-index: 5;
 }
 
-.editor-name-field {
-  max-width: 480px;
+.page-title-input {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin: -3px -9px;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
+.page-title-input:hover {
+  background: var(--vds-surface-default);
+  border-color: var(--vds-border-input-hover);
+}
+.page-title-input:focus {
+  background: var(--vds-surface-default);
+  border-color: var(--vds-border-input-focus);
 }
 
 .step-list {
@@ -1779,23 +1794,13 @@ body {
 
       <div id="view-editor" hidden>
         <nav class="vds-breadcrumbs">
-          <a href="#" id="breadcrumb-automations-link">Automations</a><span class="vds-breadcrumbs__sep">/</span>
-          <span id="breadcrumb-current">Automation</span>
+          <a href="#" id="breadcrumb-automations-link">Automations</a>
         </nav>
         <div class="vds-page-header">
-          <h2 id="page-title">Automation</h2>
-          <div style="display:flex; gap:8px">
+          <input class="vds-page-title page-title-input" id="page-title" placeholder="New automation" />
+          <div style="display:flex; gap:8px; flex: none">
             <button class="vds-btn" id="cancel-btn">Cancel</button>
             <button class="vds-btn vds-btn--primary" id="save-btn">Save automation</button>
-          </div>
-        </div>
-
-        <div class="vds-card editor-name-field" style="margin-bottom: 20px">
-          <div class="vds-form">
-            <div class="vds-field">
-              <label class="vds-label" for="automation-name">Automation name</label>
-              <input class="vds-input" id="automation-name" placeholder="e.g. Critical Fault Escalation" />
-            </div>
           </div>
         </div>
 
@@ -2347,9 +2352,7 @@ let draggingStepId = null;
 let draggingActionId = null;
 let draggingActionStepId = null;
 
-const nameInput = document.getElementById("automation-name");
 const pageTitle = document.getElementById("page-title");
-const breadcrumbCurrent = document.getElementById("breadcrumb-current");
 const stepList = document.getElementById("step-list");
 const stepTemplate = document.getElementById("step-template");
 const actionTemplate = document.getElementById("action-template");
@@ -2374,16 +2377,9 @@ function initEditor(id, isNewFlag) {
     automation = JSON.parse(JSON.stringify(found));
   }
 
-  nameInput.value = automation.name;
-  updateTitles();
+  pageTitle.value = automation.name;
   renderSteps();
   return true;
-}
-
-function updateTitles() {
-  const label = automation.name.trim() || "New automation";
-  pageTitle.textContent = label;
-  breadcrumbCurrent.textContent = label;
 }
 
 function populateSelect(selectEl, options, selectedValue) {
@@ -2698,9 +2694,8 @@ document.addEventListener("mouseup", () => {
   });
 });
 
-nameInput.addEventListener("input", () => {
-  automation.name = nameInput.value;
-  updateTitles();
+pageTitle.addEventListener("input", () => {
+  automation.name = pageTitle.value;
 });
 
 document.getElementById("add-step-btn").addEventListener("click", () => {
