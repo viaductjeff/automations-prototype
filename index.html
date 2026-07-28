@@ -1548,22 +1548,27 @@ body {
 }
 
 .page-title-input {
-  border: 1px solid transparent;
-  background: transparent;
+  border: 1px solid var(--vds-border-input);
+  background: var(--vds-surface-default);
   border-radius: 4px;
   padding: 2px 8px;
-  margin: -3px -9px;
   outline: none;
   flex: 1;
   min-width: 0;
 }
 .page-title-input:hover {
-  background: var(--vds-surface-default);
   border-color: var(--vds-border-input-hover);
 }
 .page-title-input:focus {
-  background: var(--vds-surface-default);
   border-color: var(--vds-border-input-focus);
+  outline: none;
+}
+
+.editor-page-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--vds-surface-muted);
 }
 
 .step-list {
@@ -1796,7 +1801,7 @@ body {
         <nav class="vds-breadcrumbs">
           <a href="#" id="breadcrumb-automations-link">Automations</a>
         </nav>
-        <div class="vds-page-header">
+        <div class="vds-page-header editor-page-header">
           <input class="vds-page-title page-title-input" id="page-title" placeholder="New automation" />
           <div style="display:flex; gap:8px; flex: none">
             <button class="vds-btn" id="cancel-btn">Cancel</button>
