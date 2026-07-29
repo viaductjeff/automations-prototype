@@ -1528,6 +1528,10 @@ body {
   cursor: pointer;
 }
 
+.vds-breadcrumbs {
+  margin-bottom: 4px;
+}
+
 .cell-name {
   display: flex;
   flex-direction: column;
@@ -1656,7 +1660,7 @@ body {
 
 .action-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
@@ -1670,6 +1674,10 @@ body {
   display: flex;
   align-items: center;
   flex: none;
+  /* Centers the 18px handle against the row's 36px selects — a fixed offset
+     (not align-self) so it stays pinned near the top selects even when a
+     sibling field (like the prompt textarea) makes the row much taller. */
+  margin-top: 9px;
 }
 .action-row__drag-handle:active {
   cursor: grabbing;
@@ -1696,8 +1704,18 @@ body {
   width: 260px;
 }
 
+.action-row__prompt-field {
+  width: 75%;
+}
+
+.action-prompt-textarea {
+  width: 100%;
+  resize: none;
+}
+
 .action-row__ref-field[hidden],
-.action-row__notification-field[hidden] {
+.action-row__notification-field[hidden],
+.action-row__prompt-field[hidden] {
   display: none;
 }
 
@@ -1747,7 +1765,7 @@ body {
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.4 6 9.4 7.4 8l4.6 4.6L16.6 8 18 9.4z"/></svg>
         </div>
       </li>
-      <li><a class="vds-nav-item vds-nav-item--selected"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Automations</a></li>
+      <li><a class="vds-nav-item vds-nav-item--selected" href="#" id="nav-automations-link"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg> Automations</a></li>
     </ul>
     <ul class="vds-nav vds-sidebar-footer">
       <li><a class="vds-nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2m1 17h-2v-2h2zm2.1-7.7-.9.9c-.7.7-1.2 1.3-1.2 2.8h-2v-.5c0-1.1.5-2.1 1.2-2.8l1.2-1.3c.4-.3.6-.8.6-1.4 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.2 1.8-4 4-4s4 1.8 4 4c0 .9-.4 1.7-.9 2.3"/></svg> Help</a></li>
@@ -1891,6 +1909,7 @@ body {
     </span>
     <div class="vds-field action-row__type-field">
       <select class="vds-select action-type-select">
+        <option value="prompt">Run prompt</option>
         <option value="directive">Run directive</option>
         <option value="pipeline">Run pipeline</option>
         <option value="notification">Send notification</option>
@@ -1901,6 +1920,13 @@ body {
     </div>
     <div class="vds-field action-row__notification-field" hidden>
       <button class="vds-btn configure-notification-btn" type="button">Configure notification</button>
+    </div>
+    <div class="vds-field action-row__prompt-field" hidden>
+      <textarea
+        class="vds-textarea action-prompt-textarea"
+        rows="10"
+        placeholder='Enter AI prompt. You may type "/" to be shown a list of directives.'
+      ></textarea>
     </div>
     <button class="vds-icon-btn vds-icon-btn--sm delete-action-btn" title="Remove action">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
@@ -1918,6 +1944,16 @@ body {
   <div class="vds-dialog__content">TBD</div>
   <div class="vds-dialog__actions">
     <button class="vds-btn vds-btn--primary" id="notification-dialog-done">Done</button>
+  </div>
+</dialog>
+
+<dialog class="vds-dialog" id="unsaved-changes-dialog" style="max-width: 480px">
+  <div class="vds-dialog__title">Unsaved changes</div>
+  <div class="vds-dialog__content">You have unsaved changes. If you leave without saving, they'll be lost.</div>
+  <div class="vds-dialog__actions">
+    <button class="vds-btn vds-btn--text" id="unsaved-discard-btn">Discard edits</button>
+    <button class="vds-btn" id="unsaved-return-btn">Return to editing</button>
+    <button class="vds-btn vds-btn--primary" id="unsaved-save-btn">Save</button>
   </div>
 </dialog>
 <script>
@@ -2197,12 +2233,12 @@ function newStepTemplate(seq) {
     id: "step_new_" + Date.now() + "_" + seq,
     name: "",
     trigger: { type: "event", table: TABLES[0], event: "new_row", intervalValue: 1, intervalUnit: "minutes" },
-    actions: [{ id: "act_new_" + Date.now() + "_" + seq, type: "directive", refName: "" }],
+    actions: [{ id: "act_new_" + Date.now() + "_" + seq, type: "prompt", refName: "", prompt: "" }],
   };
 }
 
 function newActionTemplate() {
-  return { id: "act_new_" + Date.now(), type: "directive", refName: "" };
+  return { id: "act_new_" + Date.now(), type: "prompt", refName: "", prompt: "" };
 }
 
 const TRIGGER_TYPE_LABELS = {
@@ -2361,6 +2397,15 @@ const pageTitle = document.getElementById("page-title");
 const stepList = document.getElementById("step-list");
 const stepTemplate = document.getElementById("step-template");
 const actionTemplate = document.getElementById("action-template");
+const saveBtn = document.getElementById("save-btn");
+
+// Save stays disabled until the user actually changes something — nothing to
+// persist for an untouched automation, new or existing.
+let isDirty = false;
+function markDirty() {
+  isDirty = true;
+  saveBtn.disabled = false;
+}
 
 function initEditor(id, isNewFlag) {
   if (isNewFlag) {
@@ -2382,6 +2427,10 @@ function initEditor(id, isNewFlag) {
     automation = JSON.parse(JSON.stringify(found));
   }
 
+  isDirty = false;
+  // A brand-new automation can be saved immediately (there's nothing to lose
+  // by creating it as-is); an existing one only becomes savable once changed.
+  saveBtn.disabled = !isNewFlag;
   pageTitle.value = automation.name;
   renderSteps();
   return true;
@@ -2426,8 +2475,9 @@ function populateRefSelect(action, selectEl) {
 }
 
 function setActionTypeFieldsVisibility(row, type) {
-  row.querySelector(".action-row__ref-field").hidden = type === "notification";
+  row.querySelector(".action-row__ref-field").hidden = type !== "directive" && type !== "pipeline";
   row.querySelector(".action-row__notification-field").hidden = type !== "notification";
+  row.querySelector(".action-row__prompt-field").hidden = type !== "prompt";
 }
 
 function buildActionRow(step, action) {
@@ -2436,21 +2486,31 @@ function buildActionRow(step, action) {
   const typeSelect = row.querySelector(".action-type-select");
   const refSelect = row.querySelector(".action-ref-select");
   const configureBtn = row.querySelector(".configure-notification-btn");
+  const promptTextarea = row.querySelector(".action-prompt-textarea");
   const deleteBtn = row.querySelector(".delete-action-btn");
 
   typeSelect.value = action.type;
-  if (action.type !== "notification") populateRefSelect(action, refSelect);
+  if (action.type === "directive" || action.type === "pipeline") populateRefSelect(action, refSelect);
+  promptTextarea.value = action.prompt || "";
   setActionTypeFieldsVisibility(row, action.type);
 
   typeSelect.addEventListener("change", () => {
+    markDirty();
     action.type = typeSelect.value;
     action.refName = "";
-    if (action.type !== "notification") populateRefSelect(action, refSelect);
+    action.prompt = "";
+    promptTextarea.value = "";
+    if (action.type === "directive" || action.type === "pipeline") populateRefSelect(action, refSelect);
     setActionTypeFieldsVisibility(row, action.type);
   });
 
   configureBtn.addEventListener("click", () => {
     document.getElementById("notification-config-dialog").showModal();
+  });
+
+  promptTextarea.addEventListener("input", () => {
+    markDirty();
+    action.prompt = promptTextarea.value;
   });
 
   refSelect.addEventListener("change", () => {
@@ -2461,17 +2521,20 @@ function buildActionRow(step, action) {
         const list = action.type === "directive" ? DIRECTIVES : PIPELINES;
         list.push(name.trim());
         action.refName = name.trim();
+        markDirty();
       }
       populateRefSelect(action, refSelect);
       return;
     }
     if (refSelect.value === PLACEHOLDER_VALUE) return;
     action.refName = refSelect.value;
+    markDirty();
   });
 
   deleteBtn.disabled = step.actions.length <= 1;
   deleteBtn.title = deleteBtn.disabled ? "At least one action is required" : "Remove action";
   deleteBtn.addEventListener("click", () => {
+    markDirty();
     step.actions = step.actions.filter((a) => a.id !== action.id);
     renderSteps();
   });
@@ -2543,6 +2606,7 @@ function buildStepCard(step, index) {
   indexLabel.textContent = `Step ${index + 1}`;
   nameField.value = step.name;
   nameField.addEventListener("input", () => {
+    markDirty();
     step.name = nameField.value;
   });
 
@@ -2560,6 +2624,7 @@ function buildStepCard(step, index) {
     radio.checked = radio.value === step.trigger.type;
     radio.addEventListener("change", () => {
       if (!radio.checked) return;
+      markDirty();
       step.trigger.type = radio.value;
       if (radio.value === "event" && !step.trigger.table) {
         step.trigger.table = TABLES[0];
@@ -2579,21 +2644,25 @@ function buildStepCard(step, index) {
     step.trigger.table
   );
   tableSelect.addEventListener("change", () => {
+    markDirty();
     step.trigger.table = tableSelect.value;
   });
 
   populateSelect(eventSelect, TABLE_EVENTS, step.trigger.event);
   eventSelect.addEventListener("change", () => {
+    markDirty();
     step.trigger.event = eventSelect.value;
   });
 
   intervalValueInput.value = step.trigger.intervalValue || 1;
   intervalValueInput.addEventListener("input", () => {
+    markDirty();
     step.trigger.intervalValue = Math.max(1, parseInt(intervalValueInput.value, 10) || 1);
   });
 
   populateSelect(intervalUnitSelect, SCHEDULE_UNITS, step.trigger.intervalUnit || "minutes");
   intervalUnitSelect.addEventListener("change", () => {
+    markDirty();
     step.trigger.intervalUnit = intervalUnitSelect.value;
   });
 
@@ -2604,6 +2673,7 @@ function buildStepCard(step, index) {
   });
 
   addActionBtn.addEventListener("click", () => {
+    markDirty();
     step.actions.push(newActionTemplate());
     renderSteps();
   });
@@ -2611,6 +2681,7 @@ function buildStepCard(step, index) {
   deleteStepBtn.disabled = automation.steps.length <= 1;
   deleteStepBtn.title = deleteStepBtn.disabled ? "At least one step is required" : "Delete step";
   deleteStepBtn.addEventListener("click", () => {
+    markDirty();
     automation.steps = automation.steps.filter((s) => s.id !== step.id);
     renderSteps();
   });
@@ -2644,6 +2715,7 @@ function buildStepCard(step, index) {
     const fromIndex = automation.steps.findIndex((s) => s.id === draggingStepId);
     const toIndex = automation.steps.findIndex((s) => s.id === step.id);
     if (fromIndex === -1 || toIndex === -1) return;
+    markDirty();
     const [moved] = automation.steps.splice(fromIndex, 1);
     automation.steps.splice(toIndex, 0, moved);
     renderSteps();
@@ -2700,10 +2772,12 @@ document.addEventListener("mouseup", () => {
 });
 
 pageTitle.addEventListener("input", () => {
+  markDirty();
   automation.name = pageTitle.value;
 });
 
 document.getElementById("add-step-btn").addEventListener("click", () => {
+  markDirty();
   automation.steps.push(newStepTemplate(automation.steps.length + 1));
   renderSteps();
 });
@@ -2721,7 +2795,7 @@ document.getElementById("cancel-btn").addEventListener("click", () => {
   showListView();
 });
 
-document.getElementById("save-btn").addEventListener("click", () => {
+function saveAutomation() {
   const today = new Date().toISOString().slice(0, 10);
   if (!automation.id) {
     automation.id = "auto_" + Date.now();
@@ -2732,6 +2806,36 @@ document.getElementById("save-btn").addEventListener("click", () => {
     automation.name = "Untitled automation";
   }
   upsertAutomation(automation);
+}
+
+document.getElementById("save-btn").addEventListener("click", () => {
+  saveAutomation();
+  showListView();
+});
+
+// The sidebar's "Automations" link always returns to the list — but if the
+// editor view is open with unsaved changes, confirm first so they aren't
+// silently discarded. No guard needed when the list view is already showing.
+const unsavedDialog = document.getElementById("unsaved-changes-dialog");
+document.getElementById("nav-automations-link").addEventListener("click", (e) => {
+  e.preventDefault();
+  if (viewEditor.hidden) return;
+  if (!isDirty) {
+    showListView();
+    return;
+  }
+  unsavedDialog.showModal();
+});
+document.getElementById("unsaved-return-btn").addEventListener("click", () => {
+  unsavedDialog.close();
+});
+document.getElementById("unsaved-discard-btn").addEventListener("click", () => {
+  unsavedDialog.close();
+  showListView();
+});
+document.getElementById("unsaved-save-btn").addEventListener("click", () => {
+  unsavedDialog.close();
+  saveAutomation();
   showListView();
 });
 
