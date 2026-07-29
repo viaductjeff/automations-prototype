@@ -1647,9 +1647,25 @@ body {
   min-width: 180px;
 }
 
-.trigger-fields-row .vds-field--narrow {
-  min-width: 100px;
-  max-width: 140px;
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-entry {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.schedule-entry__days {
+  display: flex;
+  gap: 4px;
+}
+
+.schedule-entry__time-field {
+  width: 120px;
 }
 
 .action-list {
@@ -1862,9 +1878,9 @@ body {
       <div>
         <h6 style="margin: 0 0 8px">Trigger</h6>
         <div class="trigger-choice-row" style="margin-bottom: 12px">
-          <label class="vds-choice"><input type="radio" class="vds-radio trigger-type-radio" name="" value="event" /> Table event</label>
-          <label class="vds-choice"><input type="radio" class="vds-radio trigger-type-radio" name="" value="schedule" /> Schedule</label>
           <label class="vds-choice"><input type="radio" class="vds-radio trigger-type-radio trigger-type-radio--tertiary" name="" value="after_previous" /> <span class="trigger-type-tertiary-label">After previous step</span></label>
+          <label class="vds-choice"><input type="radio" class="vds-radio trigger-type-radio" name="" value="schedule" /> Schedule</label>
+          <label class="vds-choice"><input type="radio" class="vds-radio trigger-type-radio" name="" value="event" /> Table event</label>
         </div>
         <div class="trigger-fields-row trigger-event-fields">
           <div class="vds-field">
@@ -1876,15 +1892,12 @@ body {
             <select class="vds-select trigger-event-select"></select>
           </div>
         </div>
-        <div class="trigger-fields-row trigger-schedule-fields">
-          <div class="vds-field vds-field--narrow">
-            <label class="vds-label">Every</label>
-            <input class="vds-input trigger-interval-value" type="number" min="1" value="1" />
-          </div>
-          <div class="vds-field">
-            <label class="vds-label">Unit</label>
-            <select class="vds-select trigger-interval-unit"></select>
-          </div>
+        <div class="trigger-schedule-fields">
+          <div class="schedule-list"></div>
+          <button class="vds-btn vds-btn--sm vds-btn--start-icon add-schedule-btn" style="margin-top: 8px">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+            Add schedule
+          </button>
         </div>
       </div>
 
@@ -1934,6 +1947,27 @@ body {
   </div>
 </template>
 
+<template id="schedule-entry-template">
+  <div class="schedule-entry">
+    <div class="schedule-entry__days">
+      <label class="vds-choice"><input type="checkbox" class="vds-checkbox schedule-day-checkbox" data-day="sun" /> Su</label>
+      <label class="vds-choice"><input type="checkbox" class="vds-checkbox schedule-day-checkbox" data-day="mon" /> Mo</label>
+      <label class="vds-choice"><input type="checkbox" class="vds-checkbox schedule-day-checkbox" data-day="tue" /> Tu</label>
+      <label class="vds-choice"><input type="checkbox" class="vds-checkbox schedule-day-checkbox" data-day="wed" /> We</label>
+      <label class="vds-choice"><input type="checkbox" class="vds-checkbox schedule-day-checkbox" data-day="thu" /> Th</label>
+      <label class="vds-choice"><input type="checkbox" class="vds-checkbox schedule-day-checkbox" data-day="fri" /> Fr</label>
+      <label class="vds-choice"><input type="checkbox" class="vds-checkbox schedule-day-checkbox" data-day="sat" /> Sa</label>
+    </div>
+    <div class="vds-field schedule-entry__time-field">
+      <label class="vds-label">Time</label>
+      <input type="time" class="vds-input schedule-time-input" />
+    </div>
+    <button class="vds-icon-btn vds-icon-btn--sm delete-schedule-btn" title="Remove schedule">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+</template>
+
 <dialog class="vds-dialog" id="notification-config-dialog" style="max-width: 480px">
   <div class="vds-dialog__title">
     Configure notification
@@ -1978,13 +2012,24 @@ const TABLE_EVENTS = [
   { value: "row_deleted", label: "Row deleted" },
 ];
 
-const SCHEDULE_UNITS = [
-  { value: "minutes", label: "Minutes" },
-  { value: "hours", label: "Hours" },
-  { value: "days", label: "Days" },
-  { value: "weeks", label: "Weeks" },
-  { value: "months", label: "Months" },
+const DAYS_OF_WEEK = [
+  { value: "sun", label: "Su" },
+  { value: "mon", label: "Mo" },
+  { value: "tue", label: "Tu" },
+  { value: "wed", label: "We" },
+  { value: "thu", label: "Th" },
+  { value: "fri", label: "Fr" },
+  { value: "sat", label: "Sa" },
 ];
+
+function newScheduleEntry(days, time) {
+  const defaultDays = { sun: false, mon: true, tue: true, wed: true, thu: true, fri: true, sat: false };
+  return {
+    id: "sched_new_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+    days: days || defaultDays,
+    time: time || "09:00",
+  };
+}
 
 let DIRECTIVES = [
   "Send Slack Alert",
@@ -2024,7 +2069,16 @@ function seedAutomations() {
         {
           id: "step_1_2",
           name: "Escalate if unresolved",
-          trigger: { type: "schedule", intervalValue: 30, intervalUnit: "minutes" },
+          trigger: {
+            type: "schedule",
+            schedules: [
+              {
+                id: "sched_1_2_1",
+                days: { sun: true, mon: true, tue: true, wed: true, thu: true, fri: true, sat: true },
+                time: "09:00",
+              },
+            ],
+          },
           actions: [{ id: "act_1_2_1", type: "directive", refName: "Escalate to Safety Team" }],
         },
       ],
@@ -2040,19 +2094,51 @@ function seedAutomations() {
         {
           id: "step_2_1",
           name: "Compute utilization",
-          trigger: { type: "schedule", intervalValue: 1, intervalUnit: "weeks" },
+          trigger: {
+            type: "schedule",
+            schedules: [
+              {
+                id: "sched_2_1_1",
+                days: { sun: false, mon: true, tue: true, wed: true, thu: true, fri: true, sat: false },
+                time: "06:30",
+              },
+              {
+                id: "sched_2_1_2",
+                days: { sun: false, mon: true, tue: true, wed: true, thu: true, fri: true, sat: false },
+                time: "16:30",
+              },
+            ],
+          },
           actions: [{ id: "act_2_1_1", type: "pipeline", refName: "Idle Time Aggregation" }],
         },
         {
           id: "step_2_2",
           name: "Enrich with fuel data",
-          trigger: { type: "schedule", intervalValue: 1, intervalUnit: "weeks" },
+          trigger: {
+            type: "schedule",
+            schedules: [
+              {
+                id: "sched_2_2_1",
+                days: { sun: false, mon: true, tue: true, wed: true, thu: true, fri: true, sat: false },
+                time: "07:00",
+              },
+            ],
+          },
           actions: [{ id: "act_2_2_1", type: "pipeline", refName: "Fuel Efficiency Report" }],
         },
         {
           id: "step_2_3",
           name: "Email report to managers",
-          trigger: { type: "schedule", intervalValue: 1, intervalUnit: "weeks" },
+          trigger: {
+            type: "schedule",
+            schedules: [
+              {
+                id: "sched_2_3_1",
+                days: { sun: false, mon: true, tue: false, wed: false, thu: false, fri: false, sat: false },
+                time: "08:00",
+              },
+            ],
+          },
           actions: [{ id: "act_2_3_1", type: "directive", refName: "Email Fleet Manager" }],
         },
       ],
@@ -2084,7 +2170,16 @@ function seedAutomations() {
         {
           id: "step_4_1",
           name: "Check overdue maintenance",
-          trigger: { type: "schedule", intervalValue: 1, intervalUnit: "days" },
+          trigger: {
+            type: "schedule",
+            schedules: [
+              {
+                id: "sched_4_1_1",
+                days: { sun: true, mon: true, tue: true, wed: true, thu: true, fri: true, sat: true },
+                time: "07:00",
+              },
+            ],
+          },
           actions: [{ id: "act_4_1_1", type: "pipeline", refName: "Maintenance Forecast" }],
         },
         {
@@ -2109,7 +2204,16 @@ function seedAutomations() {
         {
           id: "step_5_1",
           name: "Roll up telemetry",
-          trigger: { type: "schedule", intervalValue: 1, intervalUnit: "days" },
+          trigger: {
+            type: "schedule",
+            schedules: [
+              {
+                id: "sched_5_1_1",
+                days: { sun: true, mon: true, tue: true, wed: true, thu: true, fri: true, sat: true },
+                time: "02:00",
+              },
+            ],
+          },
           actions: [{ id: "act_5_1_1", type: "pipeline", refName: "Daily Telemetry Rollup" }],
         },
       ],
@@ -2143,7 +2247,16 @@ function seedAutomations() {
         {
           id: "step_6_4",
           name: "Weekly follow-up digest",
-          trigger: { type: "schedule", intervalValue: 1, intervalUnit: "weeks" },
+          trigger: {
+            type: "schedule",
+            schedules: [
+              {
+                id: "sched_6_4_1",
+                days: { sun: false, mon: false, tue: false, wed: false, thu: false, fri: true, sat: false },
+                time: "16:00",
+              },
+            ],
+          },
           actions: [{ id: "act_6_4_1", type: "pipeline", refName: "Fault Enrichment" }],
         },
       ],
@@ -2232,7 +2345,7 @@ function newStepTemplate(seq) {
   return {
     id: "step_new_" + Date.now() + "_" + seq,
     name: "",
-    trigger: { type: "event", table: TABLES[0], event: "new_row", intervalValue: 1, intervalUnit: "minutes" },
+    trigger: { type: "schedule", table: TABLES[0], event: "new_row", schedules: [newScheduleEntry()] },
     actions: [{ id: "act_new_" + Date.now() + "_" + seq, type: "prompt", refName: "", prompt: "" }],
   };
 }
@@ -2244,7 +2357,7 @@ function newActionTemplate() {
 const TRIGGER_TYPE_LABELS = {
   event: "Table event",
   schedule: "Schedule",
-  manual: "Manual invocation",
+  manual: "Manually run",
   after_previous: "After previous step",
 };
 
@@ -2397,6 +2510,7 @@ const pageTitle = document.getElementById("page-title");
 const stepList = document.getElementById("step-list");
 const stepTemplate = document.getElementById("step-template");
 const actionTemplate = document.getElementById("action-template");
+const scheduleTemplate = document.getElementById("schedule-entry-template");
 const saveBtn = document.getElementById("save-btn");
 
 // Save stays disabled until the user actually changes something — nothing to
@@ -2588,6 +2702,47 @@ function setTriggerFieldsVisibility(cardEl, type) {
   cardEl.querySelector(".trigger-schedule-fields").hidden = type !== "schedule";
 }
 
+function buildScheduleEntry(step, schedule) {
+  const frag = scheduleTemplate.content.cloneNode(true);
+  const entry = frag.querySelector(".schedule-entry");
+  const dayCheckboxes = entry.querySelectorAll(".schedule-day-checkbox");
+  const timeInput = entry.querySelector(".schedule-time-input");
+  const deleteBtn = entry.querySelector(".delete-schedule-btn");
+
+  dayCheckboxes.forEach((checkbox) => {
+    const day = checkbox.dataset.day;
+    checkbox.checked = !!schedule.days[day];
+    checkbox.addEventListener("change", () => {
+      markDirty();
+      schedule.days[day] = checkbox.checked;
+    });
+  });
+
+  timeInput.value = schedule.time;
+  timeInput.addEventListener("input", () => {
+    markDirty();
+    schedule.time = timeInput.value;
+  });
+
+  deleteBtn.disabled = step.trigger.schedules.length <= 1;
+  deleteBtn.title = deleteBtn.disabled ? "At least one schedule is required" : "Remove schedule";
+  deleteBtn.addEventListener("click", () => {
+    markDirty();
+    step.trigger.schedules = step.trigger.schedules.filter((s) => s.id !== schedule.id);
+    renderSteps();
+  });
+
+  return entry;
+}
+
+function renderScheduleList(step, card) {
+  const scheduleList = card.querySelector(".schedule-list");
+  scheduleList.innerHTML = "";
+  (step.trigger.schedules || []).forEach((schedule) => {
+    scheduleList.appendChild(buildScheduleEntry(step, schedule));
+  });
+}
+
 function buildStepCard(step, index) {
   const frag = stepTemplate.content.cloneNode(true);
   const card = frag.querySelector(".step-card");
@@ -2598,8 +2753,7 @@ function buildStepCard(step, index) {
   const radios = card.querySelectorAll(".trigger-type-radio");
   const tableSelect = card.querySelector(".trigger-table-select");
   const eventSelect = card.querySelector(".trigger-event-select");
-  const intervalValueInput = card.querySelector(".trigger-interval-value");
-  const intervalUnitSelect = card.querySelector(".trigger-interval-unit");
+  const addScheduleBtn = card.querySelector(".add-schedule-btn");
   const actionList = card.querySelector(".action-list");
   const addActionBtn = card.querySelector(".add-action-btn");
 
@@ -2611,12 +2765,12 @@ function buildStepCard(step, index) {
   });
 
   // The third trigger option means something different depending on position:
-  // manual invocation for the entry step, chaining off the prior step otherwise.
+  // running manually for the entry step, chaining off the prior step otherwise.
   // Both are always enabled — there's no invalid position for either meaning.
   const tertiaryRadio = card.querySelector(".trigger-type-radio--tertiary");
   const tertiaryLabel = card.querySelector(".trigger-type-tertiary-label");
   tertiaryRadio.value = index === 0 ? "manual" : "after_previous";
-  tertiaryLabel.textContent = index === 0 ? "Manual invocation" : "After previous step";
+  tertiaryLabel.textContent = index === 0 ? "Manually run" : "After previous step";
 
   const radioGroupName = "trigger-type-" + step.id;
   radios.forEach((radio) => {
@@ -2630,9 +2784,11 @@ function buildStepCard(step, index) {
         step.trigger.table = TABLES[0];
         tableSelect.value = TABLES[0];
       }
-      if (radio.value === "schedule" && !step.trigger.intervalUnit) {
-        step.trigger.intervalUnit = "minutes";
-        step.trigger.intervalValue = step.trigger.intervalValue || 1;
+      if (radio.value === "schedule" && (!step.trigger.schedules || step.trigger.schedules.length === 0)) {
+        step.trigger.schedules = [newScheduleEntry()];
+      }
+      if (radio.value === "schedule") {
+        renderScheduleList(step, card);
       }
       setTriggerFieldsVisibility(card, step.trigger.type);
     });
@@ -2654,16 +2810,12 @@ function buildStepCard(step, index) {
     step.trigger.event = eventSelect.value;
   });
 
-  intervalValueInput.value = step.trigger.intervalValue || 1;
-  intervalValueInput.addEventListener("input", () => {
+  renderScheduleList(step, card);
+  addScheduleBtn.addEventListener("click", () => {
     markDirty();
-    step.trigger.intervalValue = Math.max(1, parseInt(intervalValueInput.value, 10) || 1);
-  });
-
-  populateSelect(intervalUnitSelect, SCHEDULE_UNITS, step.trigger.intervalUnit || "minutes");
-  intervalUnitSelect.addEventListener("change", () => {
-    markDirty();
-    step.trigger.intervalUnit = intervalUnitSelect.value;
+    if (!step.trigger.schedules) step.trigger.schedules = [];
+    step.trigger.schedules.push(newScheduleEntry());
+    renderSteps();
   });
 
   setTriggerFieldsVisibility(card, step.trigger.type);
