@@ -1560,6 +1560,9 @@ body {
   flex: 1;
   min-width: 0;
 }
+.page-title-input::placeholder {
+  color: var(--vds-text-placeholder);
+}
 .page-title-input:hover {
   border-color: var(--vds-border-input-hover);
 }
@@ -1833,10 +1836,11 @@ body {
 
       <div id="view-editor" hidden>
         <nav class="vds-breadcrumbs">
-          <a href="#" id="breadcrumb-automations-link">Automations</a>
+          <a href="#" id="breadcrumb-automations-link">Automations</a><span class="vds-breadcrumbs__sep">/</span>
+          <span>Automation</span>
         </nav>
         <div class="vds-page-header editor-page-header">
-          <input class="vds-page-title page-title-input" id="page-title" placeholder="New automation" />
+          <input class="vds-page-title page-title-input" id="page-title" placeholder="Unnamed automation" />
           <div style="display:flex; gap:8px; flex: none">
             <button class="vds-btn" id="cancel-btn">Cancel</button>
             <button class="vds-btn vds-btn--primary" id="save-btn">Save automation</button>
@@ -1959,7 +1963,6 @@ body {
       <label class="vds-choice"><input type="checkbox" class="vds-checkbox schedule-day-checkbox" data-day="sat" /> Sa</label>
     </div>
     <div class="vds-field schedule-entry__time-field">
-      <label class="vds-label">Time</label>
       <input type="time" class="vds-input schedule-time-input" />
     </div>
     <button class="vds-icon-btn vds-icon-btn--sm delete-schedule-btn" title="Remove schedule">
@@ -2390,6 +2393,11 @@ function showEditorView(id, isNewFlag) {
   if (!ok) return;
   viewList.hidden = true;
   viewEditor.hidden = false;
+  // Focus only works once the view is actually visible — initEditor() runs
+  // while it's still hidden.
+  if (isNewFlag) {
+    pageTitle.focus();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2512,13 +2520,22 @@ const stepTemplate = document.getElementById("step-template");
 const actionTemplate = document.getElementById("action-template");
 const scheduleTemplate = document.getElementById("schedule-entry-template");
 const saveBtn = document.getElementById("save-btn");
+const unsavedSaveBtn = document.getElementById("unsaved-save-btn");
 
 // Save stays disabled until the user actually changes something — nothing to
-// persist for an untouched automation, new or existing.
+// persist for an untouched automation, new or existing. A never-saved
+// automation additionally requires a real name — there's no sensible
+// placeholder-derived name to fall back to. Both the page's Save button and
+// the unsaved-changes dialog's Save button share this state.
 let isDirty = false;
+function updateSaveButtonState() {
+  const disabled = automation.id ? !isDirty : pageTitle.value.trim().length === 0;
+  saveBtn.disabled = disabled;
+  unsavedSaveBtn.disabled = disabled;
+}
 function markDirty() {
   isDirty = true;
-  saveBtn.disabled = false;
+  updateSaveButtonState();
 }
 
 function initEditor(id, isNewFlag) {
@@ -2542,10 +2559,8 @@ function initEditor(id, isNewFlag) {
   }
 
   isDirty = false;
-  // A brand-new automation can be saved immediately (there's nothing to lose
-  // by creating it as-is); an existing one only becomes savable once changed.
-  saveBtn.disabled = !isNewFlag;
   pageTitle.value = automation.name;
+  updateSaveButtonState();
   renderSteps();
   return true;
 }
@@ -2954,9 +2969,6 @@ function saveAutomation() {
     automation.createdAt = today;
     automation.createdBy = "Jeff Kroll";
   }
-  if (!automation.name.trim()) {
-    automation.name = "Untitled automation";
-  }
   upsertAutomation(automation);
 }
 
@@ -2985,7 +2997,7 @@ document.getElementById("unsaved-discard-btn").addEventListener("click", () => {
   unsavedDialog.close();
   showListView();
 });
-document.getElementById("unsaved-save-btn").addEventListener("click", () => {
+unsavedSaveBtn.addEventListener("click", () => {
   unsavedDialog.close();
   saveAutomation();
   showListView();
