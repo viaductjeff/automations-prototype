@@ -1515,6 +1515,7 @@ a {
   max-width: 700px;
 }
 
+
 /* Layout-only additions on top of vds.css. No colors/radii/shadows/control
    sizes here — those all come from vds-* classes and --vds-* tokens. */
 
@@ -1929,6 +1930,7 @@ body {
         <option value="prompt">Run prompt</option>
         <option value="directive">Run directive</option>
         <option value="pipeline">Run pipeline</option>
+        <option value="import_table">Import Viaduct table</option>
         <option value="notification">Send notification</option>
       </select>
     </div>
@@ -2008,6 +2010,9 @@ const TABLES = [
   "Inspections",
   "Fuel Transactions",
 ];
+
+// Tables whose connections are configured to allow importing.
+const IMPORTABLE_TABLES = ["Fuel Transactions", "Inspections", "Maintenance Records", "Trips"];
 
 const TABLE_EVENTS = [
   { value: "new_row", label: "New row" },
@@ -2576,9 +2581,13 @@ function populateSelect(selectEl, options, selectedValue) {
   });
 }
 
+const REF_SELECT_TYPES = ["directive", "pipeline", "import_table"];
+
 function populateRefSelect(action, selectEl) {
-  const list = action.type === "directive" ? DIRECTIVES : PIPELINES;
-  const typeLabel = action.type === "directive" ? "directive" : "pipeline";
+  const list = action.type === "directive" ? DIRECTIVES : action.type === "pipeline" ? PIPELINES : IMPORTABLE_TABLES;
+  const typeLabel = action.type === "directive" ? "directive" : action.type === "pipeline" ? "pipeline" : "table";
+  // Tables come from existing connections — there's nothing to create here.
+  const allowCreate = action.type === "directive" || action.type === "pipeline";
   selectEl.innerHTML = "";
 
   if (!action.refName) {
@@ -2597,14 +2606,16 @@ function populateRefSelect(action, selectEl) {
     selectEl.appendChild(optionEl);
   });
 
-  const createOption = document.createElement("option");
-  createOption.value = CREATE_NEW_VALUE;
-  createOption.textContent = `+ Create new ${typeLabel}…`;
-  selectEl.appendChild(createOption);
+  if (allowCreate) {
+    const createOption = document.createElement("option");
+    createOption.value = CREATE_NEW_VALUE;
+    createOption.textContent = `+ Create new ${typeLabel}…`;
+    selectEl.appendChild(createOption);
+  }
 }
 
 function setActionTypeFieldsVisibility(row, type) {
-  row.querySelector(".action-row__ref-field").hidden = type !== "directive" && type !== "pipeline";
+  row.querySelector(".action-row__ref-field").hidden = !REF_SELECT_TYPES.includes(type);
   row.querySelector(".action-row__notification-field").hidden = type !== "notification";
   row.querySelector(".action-row__prompt-field").hidden = type !== "prompt";
 }
@@ -2619,7 +2630,7 @@ function buildActionRow(step, action) {
   const deleteBtn = row.querySelector(".delete-action-btn");
 
   typeSelect.value = action.type;
-  if (action.type === "directive" || action.type === "pipeline") populateRefSelect(action, refSelect);
+  if (REF_SELECT_TYPES.includes(action.type)) populateRefSelect(action, refSelect);
   promptTextarea.value = action.prompt || "";
   setActionTypeFieldsVisibility(row, action.type);
 
@@ -2629,7 +2640,7 @@ function buildActionRow(step, action) {
     action.refName = "";
     action.prompt = "";
     promptTextarea.value = "";
-    if (action.type === "directive" || action.type === "pipeline") populateRefSelect(action, refSelect);
+    if (REF_SELECT_TYPES.includes(action.type)) populateRefSelect(action, refSelect);
     setActionTypeFieldsVisibility(row, action.type);
   });
 
@@ -3006,6 +3017,7 @@ unsavedSaveBtn.addEventListener("click", () => {
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
+
 
 showListView();
 </script>
