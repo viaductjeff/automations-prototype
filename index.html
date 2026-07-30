@@ -1637,6 +1637,9 @@ body {
   display: flex;
   gap: 24px;
 }
+.trigger-choice-row[hidden] {
+  display: none;
+}
 
 .trigger-fields-row {
   display: flex;
@@ -1649,6 +1652,23 @@ body {
 
 .trigger-fields-row .vds-field {
   min-width: 180px;
+}
+
+.trigger-after-previous {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.trigger-after-previous[hidden] {
+  display: none;
+}
+
+.trigger-delay-value {
+  width: 64px;
+}
+
+.trigger-delay-unit {
+  width: 110px;
 }
 
 .schedule-list {
@@ -1883,9 +1903,15 @@ body {
       <div>
         <h6 style="margin: 0 0 8px">Trigger</h6>
         <div class="trigger-choice-row" style="margin-bottom: 12px">
-          <label class="vds-choice"><input type="radio" class="vds-radio trigger-type-radio trigger-type-radio--tertiary" name="" value="after_previous" /> <span class="trigger-type-tertiary-label">After previous step</span></label>
+          <label class="vds-choice"><input type="radio" class="vds-radio trigger-type-radio" name="" value="manual" /> Manually run</label>
           <label class="vds-choice"><input type="radio" class="vds-radio trigger-type-radio" name="" value="schedule" /> Schedule</label>
           <label class="vds-choice"><input type="radio" class="vds-radio trigger-type-radio" name="" value="event" /> Table event</label>
+        </div>
+        <div class="trigger-after-previous" hidden>
+          <span class="vds-b2">After the previous step</span>
+          <label class="vds-choice"><input type="checkbox" class="vds-checkbox trigger-delay-checkbox" /> with delay</label>
+          <input class="vds-input vds-input--sm trigger-delay-value" type="text" inputmode="numeric" maxlength="3" />
+          <select class="vds-select vds-select--sm trigger-delay-unit"></select>
         </div>
         <div class="trigger-fields-row trigger-event-fields">
           <div class="vds-field">
@@ -1999,7 +2025,7 @@ body {
 // Mock data layer for the Automations prototype. Persists to localStorage so
 // the list and editor pages share state across navigation.
 
-const STORAGE_KEY = "vds_proto_automations_v1";
+const STORAGE_KEY = "vds_proto_automations_v2";
 
 const TABLES = [
   "Vehicles",
@@ -2028,6 +2054,12 @@ const DAYS_OF_WEEK = [
   { value: "thu", label: "Th" },
   { value: "fri", label: "Fr" },
   { value: "sat", label: "Sa" },
+];
+
+const DELAY_UNITS = [
+  { value: "minutes", label: "minutes" },
+  { value: "hours", label: "hours" },
+  { value: "days", label: "days" },
 ];
 
 function newScheduleEntry(days, time) {
@@ -2077,16 +2109,7 @@ function seedAutomations() {
         {
           id: "step_1_2",
           name: "Escalate if unresolved",
-          trigger: {
-            type: "schedule",
-            schedules: [
-              {
-                id: "sched_1_2_1",
-                days: { sun: true, mon: true, tue: true, wed: true, thu: true, fri: true, sat: true },
-                time: "09:00",
-              },
-            ],
-          },
+          trigger: { type: "after_previous", delayEnabled: true, delayValue: "30", delayUnit: "minutes" },
           actions: [{ id: "act_1_2_1", type: "directive", refName: "Escalate to Safety Team" }],
         },
       ],
@@ -2122,31 +2145,13 @@ function seedAutomations() {
         {
           id: "step_2_2",
           name: "Enrich with fuel data",
-          trigger: {
-            type: "schedule",
-            schedules: [
-              {
-                id: "sched_2_2_1",
-                days: { sun: false, mon: true, tue: true, wed: true, thu: true, fri: true, sat: false },
-                time: "07:00",
-              },
-            ],
-          },
+          trigger: { type: "after_previous", delayEnabled: false, delayValue: "5", delayUnit: "minutes" },
           actions: [{ id: "act_2_2_1", type: "pipeline", refName: "Fuel Efficiency Report" }],
         },
         {
           id: "step_2_3",
           name: "Email report to managers",
-          trigger: {
-            type: "schedule",
-            schedules: [
-              {
-                id: "sched_2_3_1",
-                days: { sun: false, mon: true, tue: false, wed: false, thu: false, fri: false, sat: false },
-                time: "08:00",
-              },
-            ],
-          },
+          trigger: { type: "after_previous", delayEnabled: true, delayValue: "2", delayUnit: "hours" },
           actions: [{ id: "act_2_3_1", type: "directive", refName: "Email Fleet Manager" }],
         },
       ],
@@ -2193,7 +2198,7 @@ function seedAutomations() {
         {
           id: "step_4_2",
           name: "Notify service team",
-          trigger: { type: "event", table: "Maintenance Records", event: "row_updated" },
+          trigger: { type: "after_previous", delayEnabled: false, delayValue: "5", delayUnit: "minutes" },
           actions: [
             { id: "act_4_2_1", type: "directive", refName: "Create Work Order" },
             { id: "act_4_2_2", type: "directive", refName: "Email Fleet Manager" },
@@ -2243,28 +2248,19 @@ function seedAutomations() {
         {
           id: "step_6_2",
           name: "Create work order",
-          trigger: { type: "event", table: "Inspections", event: "row_updated" },
+          trigger: { type: "after_previous", delayEnabled: false, delayValue: "5", delayUnit: "minutes" },
           actions: [{ id: "act_6_2_1", type: "directive", refName: "Create Work Order" }],
         },
         {
           id: "step_6_3",
           name: "Notify driver",
-          trigger: { type: "event", table: "Inspections", event: "row_updated" },
+          trigger: { type: "after_previous", delayEnabled: true, delayValue: "15", delayUnit: "minutes" },
           actions: [{ id: "act_6_3_1", type: "directive", refName: "Notify Driver App" }],
         },
         {
           id: "step_6_4",
           name: "Weekly follow-up digest",
-          trigger: {
-            type: "schedule",
-            schedules: [
-              {
-                id: "sched_6_4_1",
-                days: { sun: false, mon: false, tue: false, wed: false, thu: false, fri: true, sat: false },
-                time: "16:00",
-              },
-            ],
-          },
+          trigger: { type: "after_previous", delayEnabled: true, delayValue: "7", delayUnit: "days" },
           actions: [{ id: "act_6_4_1", type: "pipeline", refName: "Fault Enrichment" }],
         },
       ],
@@ -2286,7 +2282,7 @@ function seedAutomations() {
         {
           id: "step_7_2",
           name: "Notify requester",
-          trigger: { type: "after_previous" },
+          trigger: { type: "after_previous", delayEnabled: false, delayValue: "5", delayUnit: "minutes" },
           actions: [{ id: "act_7_2_1", type: "directive", refName: "Email Fleet Manager" }],
         },
       ],
@@ -2353,7 +2349,15 @@ function newStepTemplate(seq) {
   return {
     id: "step_new_" + Date.now() + "_" + seq,
     name: "",
-    trigger: { type: "schedule", table: TABLES[0], event: "new_row", schedules: [newScheduleEntry()] },
+    trigger: {
+      type: "schedule",
+      table: TABLES[0],
+      event: "new_row",
+      schedules: [newScheduleEntry()],
+      delayEnabled: false,
+      delayValue: "5",
+      delayUnit: "minutes",
+    },
     actions: [{ id: "act_new_" + Date.now() + "_" + seq, type: "prompt", refName: "", prompt: "" }],
   };
 }
@@ -2723,9 +2727,13 @@ function buildActionRow(step, action) {
   return row;
 }
 
-function setTriggerFieldsVisibility(cardEl, type) {
-  cardEl.querySelector(".trigger-event-fields").hidden = type !== "event";
-  cardEl.querySelector(".trigger-schedule-fields").hidden = type !== "schedule";
+// Only the first step picks a trigger; every later step runs after the one
+// before it, so all it shows is the optional delay.
+function setTriggerFieldsVisibility(cardEl, type, isFirst) {
+  cardEl.querySelector(".trigger-choice-row").hidden = !isFirst;
+  cardEl.querySelector(".trigger-after-previous").hidden = isFirst;
+  cardEl.querySelector(".trigger-event-fields").hidden = !(isFirst && type === "event");
+  cardEl.querySelector(".trigger-schedule-fields").hidden = !(isFirst && type === "schedule");
 }
 
 function buildScheduleEntry(step, schedule) {
@@ -2790,14 +2798,6 @@ function buildStepCard(step, index) {
     step.name = nameField.value;
   });
 
-  // The third trigger option means something different depending on position:
-  // running manually for the entry step, chaining off the prior step otherwise.
-  // Both are always enabled — there's no invalid position for either meaning.
-  const tertiaryRadio = card.querySelector(".trigger-type-radio--tertiary");
-  const tertiaryLabel = card.querySelector(".trigger-type-tertiary-label");
-  tertiaryRadio.value = index === 0 ? "manual" : "after_previous";
-  tertiaryLabel.textContent = index === 0 ? "Manually run" : "After previous step";
-
   const radioGroupName = "trigger-type-" + step.id;
   radios.forEach((radio) => {
     radio.name = radioGroupName;
@@ -2816,8 +2816,37 @@ function buildStepCard(step, index) {
       if (radio.value === "schedule") {
         renderScheduleList(step, card);
       }
-      setTriggerFieldsVisibility(card, step.trigger.type);
+      setTriggerFieldsVisibility(card, step.trigger.type, index === 0);
     });
+  });
+
+  const delayCheckbox = card.querySelector(".trigger-delay-checkbox");
+  const delayValueInput = card.querySelector(".trigger-delay-value");
+  const delayUnitSelect = card.querySelector(".trigger-delay-unit");
+  // The amount is only meaningful once the delay is switched on.
+  const syncDelayEnabled = () => {
+    delayValueInput.disabled = !delayCheckbox.checked;
+    delayUnitSelect.disabled = !delayCheckbox.checked;
+  };
+
+  delayCheckbox.checked = !!step.trigger.delayEnabled;
+  delayValueInput.value = step.trigger.delayValue ?? "";
+  populateSelect(delayUnitSelect, DELAY_UNITS, step.trigger.delayUnit ?? "minutes");
+  syncDelayEnabled();
+
+  delayCheckbox.addEventListener("change", () => {
+    markDirty();
+    step.trigger.delayEnabled = delayCheckbox.checked;
+    syncDelayEnabled();
+  });
+  delayValueInput.addEventListener("input", () => {
+    markDirty();
+    delayValueInput.value = delayValueInput.value.replace(/\D/g, "").slice(0, 3);
+    step.trigger.delayValue = delayValueInput.value;
+  });
+  delayUnitSelect.addEventListener("change", () => {
+    markDirty();
+    step.trigger.delayUnit = delayUnitSelect.value;
   });
 
   populateSelect(
@@ -2844,7 +2873,7 @@ function buildStepCard(step, index) {
     renderSteps();
   });
 
-  setTriggerFieldsVisibility(card, step.trigger.type);
+  setTriggerFieldsVisibility(card, step.trigger.type, index === 0);
 
   step.actions.forEach((action) => {
     actionList.appendChild(buildActionRow(step, action));
@@ -2903,14 +2932,15 @@ function buildStepCard(step, index) {
 }
 
 function renderSteps() {
-  // The third trigger option's stored value tracks which position it's in —
-  // "manual" only makes sense at index 0, "after_previous" everywhere else.
-  // Reordering or deleting steps can move either into the wrong position, so
-  // translate on every render instead of only guarding index 0.
+  // Position decides the trigger: only the entry step chooses one, and every
+  // later step chains off the previous. Reordering or deleting can move a step
+  // between those roles, so re-derive on every render. A step demoted out of
+  // first place keeps its old schedule/table values so they come back if it
+  // returns to the top.
   automation.steps.forEach((step, index) => {
-    if (index === 0 && step.trigger.type === "after_previous") {
-      step.trigger.type = "manual";
-    } else if (index > 0 && step.trigger.type === "manual") {
+    if (index === 0) {
+      if (step.trigger.type === "after_previous") step.trigger.type = "manual";
+    } else {
       step.trigger.type = "after_previous";
     }
   });
