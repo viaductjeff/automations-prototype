@@ -1515,7 +1515,6 @@ a {
   max-width: 700px;
 }
 
-
 /* Layout-only additions on top of vds.css. No colors/radii/shadows/control
    sizes here — those all come from vds-* classes and --vds-* tokens. */
 
@@ -1732,10 +1731,10 @@ body {
   outline-offset: 2px;
 }
 
-/* Fits the longest action label ("Import Viaduct table") plus the select's
+/* Fits the longest action label ("Run data transformation") plus the select's
    12px text inset and 32px chevron gutter — add a longer label and this grows. */
 .action-row__type-field {
-  width: 184px;
+  width: 208px;
 }
 
 .action-row__ref-field {
@@ -1956,10 +1955,9 @@ body {
     <div class="vds-field action-row__type-field">
       <select class="vds-select action-type-select">
         <option value="prompt">Run prompt</option>
-        <option value="directive">Run directive</option>
-        <option value="pipeline">Run pipeline</option>
+        <option value="pipeline">Run data transformation</option>
         <option value="import_table">Import Viaduct table</option>
-        <option value="notification">Send notification</option>
+        <option value="notification">Notify people</option>
       </select>
     </div>
     <div class="vds-field action-row__ref-field">
@@ -2027,7 +2025,7 @@ body {
 // Mock data layer for the Automations prototype. Persists to localStorage so
 // the list and editor pages share state across navigation.
 
-const STORAGE_KEY = "vds_proto_automations_v2";
+const STORAGE_KEY = "vds_proto_automations_v3";
 
 const TABLES = [
   "Vehicles",
@@ -2073,15 +2071,6 @@ function newScheduleEntry(days, time) {
   };
 }
 
-let DIRECTIVES = [
-  "Send Slack Alert",
-  "Email Fleet Manager",
-  "Flag Vehicle for Service",
-  "Notify Driver App",
-  "Create Work Order",
-  "Escalate to Safety Team",
-];
-
 let PIPELINES = [
   "Daily Telemetry Rollup",
   "Fault Enrichment",
@@ -2106,13 +2095,13 @@ function seedAutomations() {
           id: "step_1_1",
           name: "Detect critical fault",
           trigger: { type: "event", table: "Faults", event: "new_row" },
-          actions: [{ id: "act_1_1_1", type: "directive", refName: "Send Slack Alert" }],
+          actions: [{ id: "act_1_1_1", type: "notification" }],
         },
         {
           id: "step_1_2",
           name: "Escalate if unresolved",
           trigger: { type: "after_previous", delayEnabled: true, delayValue: "30", delayUnit: "minutes" },
-          actions: [{ id: "act_1_2_1", type: "directive", refName: "Escalate to Safety Team" }],
+          actions: [{ id: "act_1_2_1", type: "notification" }],
         },
       ],
     },
@@ -2154,7 +2143,7 @@ function seedAutomations() {
           id: "step_2_3",
           name: "Email report to managers",
           trigger: { type: "after_previous", delayEnabled: true, delayValue: "2", delayUnit: "hours" },
-          actions: [{ id: "act_2_3_1", type: "directive", refName: "Email Fleet Manager" }],
+          actions: [{ id: "act_2_3_1", type: "notification" }],
         },
       ],
     },
@@ -2170,7 +2159,7 @@ function seedAutomations() {
           id: "step_3_1",
           name: "Sync new driver record",
           trigger: { type: "event", table: "Drivers", event: "new_row" },
-          actions: [{ id: "act_3_1_1", type: "directive", refName: "Notify Driver App" }],
+          actions: [{ id: "act_3_1_1", type: "notification" }],
         },
       ],
     },
@@ -2202,8 +2191,8 @@ function seedAutomations() {
           name: "Notify service team",
           trigger: { type: "after_previous", delayEnabled: false, delayValue: "5", delayUnit: "minutes" },
           actions: [
-            { id: "act_4_2_1", type: "directive", refName: "Create Work Order" },
-            { id: "act_4_2_2", type: "directive", refName: "Email Fleet Manager" },
+            { id: "act_4_2_1", type: "prompt", prompt: "Create a work order for each overdue vehicle and assign it to the service team." },
+            { id: "act_4_2_2", type: "notification" },
           ],
         },
       ],
@@ -2245,19 +2234,19 @@ function seedAutomations() {
           id: "step_6_1",
           name: "Detect failed inspection",
           trigger: { type: "event", table: "Inspections", event: "new_row" },
-          actions: [{ id: "act_6_1_1", type: "directive", refName: "Flag Vehicle for Service" }],
+          actions: [{ id: "act_6_1_1", type: "prompt", prompt: "Flag the vehicle for service and summarize the failed inspection items." }],
         },
         {
           id: "step_6_2",
           name: "Create work order",
           trigger: { type: "after_previous", delayEnabled: false, delayValue: "5", delayUnit: "minutes" },
-          actions: [{ id: "act_6_2_1", type: "directive", refName: "Create Work Order" }],
+          actions: [{ id: "act_6_2_1", type: "prompt", prompt: "Create a work order covering the failed inspection items." }],
         },
         {
           id: "step_6_3",
           name: "Notify driver",
           trigger: { type: "after_previous", delayEnabled: true, delayValue: "15", delayUnit: "minutes" },
-          actions: [{ id: "act_6_3_1", type: "directive", refName: "Notify Driver App" }],
+          actions: [{ id: "act_6_3_1", type: "notification" }],
         },
         {
           id: "step_6_4",
@@ -2285,7 +2274,7 @@ function seedAutomations() {
           id: "step_7_2",
           name: "Notify requester",
           trigger: { type: "after_previous", delayEnabled: false, delayValue: "5", delayUnit: "minutes" },
-          actions: [{ id: "act_7_2_1", type: "directive", refName: "Email Fleet Manager" }],
+          actions: [{ id: "act_7_2_1", type: "notification" }],
         },
       ],
     },
@@ -2587,13 +2576,13 @@ function populateSelect(selectEl, options, selectedValue) {
   });
 }
 
-const REF_SELECT_TYPES = ["directive", "pipeline", "import_table"];
+const REF_SELECT_TYPES = ["pipeline", "import_table"];
 
 function populateRefSelect(action, selectEl) {
-  const list = action.type === "directive" ? DIRECTIVES : action.type === "pipeline" ? PIPELINES : IMPORTABLE_TABLES;
-  const typeLabel = action.type === "directive" ? "directive" : action.type === "pipeline" ? "pipeline" : "table";
+  const list = action.type === "pipeline" ? PIPELINES : IMPORTABLE_TABLES;
+  const typeLabel = action.type === "pipeline" ? "data transformation" : "table";
   // Tables come from existing connections — there's nothing to create here.
-  const allowCreate = action.type === "directive" || action.type === "pipeline";
+  const allowCreate = action.type === "pipeline";
   selectEl.innerHTML = "";
 
   if (!action.refName) {
@@ -2661,11 +2650,10 @@ function buildActionRow(step, action) {
 
   refSelect.addEventListener("change", () => {
     if (refSelect.value === CREATE_NEW_VALUE) {
-      const typeLabel = action.type === "directive" ? "directive" : "pipeline";
-      const name = window.prompt(`Name for the new ${typeLabel}:`);
+      // Only data transformations offer this option, so PIPELINES is the only list to grow.
+      const name = window.prompt("Name for the new data transformation:");
       if (name && name.trim()) {
-        const list = action.type === "directive" ? DIRECTIVES : PIPELINES;
-        list.push(name.trim());
+        PIPELINES.push(name.trim());
         action.refName = name.trim();
         markDirty();
       }
